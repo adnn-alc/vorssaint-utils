@@ -16116,6 +16116,11 @@ struct MetricsTests {
             expect(hub.activeCountFormat.contains("%1$d") && hub.activeCountFormat.contains("%2$d"),
                    "count format keeps positional specifiers (\(language.rawValue))")
         }
+        for language in AppLanguage.allCases {
+            let clipboard = FeatureStrings.clipboard(language)
+            expectFormat(clipboard.deleteSelectedFormat, ["d"],
+                         "\(language.rawValue) clipboard bulk-delete format")
+        }
         expect(FeatureStrings.hub(.ptBR).pageTitle == "Recursos"
                 && FeatureStrings.hub(.enUS).pageTitle == "Features",
                "hub page title reads naturally in the owner languages")
