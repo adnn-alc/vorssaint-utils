@@ -61,6 +61,7 @@ enum SettingsDirectory {
                          superKeySource: SuperKeySource = SuperKeyService.shared.source)
         -> [(title: String, items: [SettingsDirectoryItem])] {
         let categories = FeatureStrings.settingsCategories(language)
+        let quitProtection = FeatureStrings.quitProtection(language)
         return [
             (categories.essentials, [
                 SettingsDirectoryItem(page: .general, title: s.tabGeneral, icon: "gearshape",
@@ -88,6 +89,8 @@ enum SettingsDirectory {
                                                         .externalDisplayToggle,
                                                       FeatureStrings.keepAwakeAutomation(language)
                                                         .powerToggle,
+                                                      FeatureStrings.keepAwakeAutomation(language)
+                                                        .pauseWhenLockedToggle,
                                                       FeatureStrings.keepAwakeDisplaySleep(language)
                                                         .allowDisplaySleep]),
                                         (.brightness, [FeatureStrings.brightness(language).pageTitle,
@@ -148,10 +151,11 @@ enum SettingsDirectory {
                 SettingsDirectoryItem(page: .autoQuit, title: s.autoQuitName, icon: "xmark.rectangle",
                                       keywords: [s.autoQuitEnable]),
                 SettingsDirectoryItem(page: .quitProtection,
-                                      title: FeatureStrings.quitProtection(language).name,
+                                      title: quitProtection.name,
                                       icon: "shield.lefthalf.filled",
-                                      keywords: [FeatureStrings.quitProtection(language).description,
-                                                 "⌘Q", "⌘W", "hold", "double press", "modifier"]),
+                                      keywords: [quitProtection.description, "⌘Q", "⌘W",
+                                                 quitProtection.hold, quitProtection.doublePress,
+                                                 quitProtection.extraModifier]),
             ]),
             (categories.files, [
                 SettingsDirectoryItem(page: .clipboard, title: FeatureStrings.clipboard(language).title,
@@ -178,7 +182,8 @@ enum SettingsDirectory {
                                          [FeatureStrings.finderRename(language).enableLabel]),
                                        ]),
                 SettingsDirectoryItem(page: .shelf, title: s.shelfName, icon: "tray.full",
-                                      keywords: [s.shelfEnable, s.shelfDropZoneToggle, s.shelfEdgeToggle]),
+                                      keywords: [s.shelfEnable, s.shelfDropZoneToggle, s.shelfEdgeToggle,
+                                                 s.shelfClearOnClose]),
                 SettingsDirectoryItem(page: .media, title: s.mediaName, icon: "photo.on.rectangle.angled",
                                       keywords: ["PDF", "GIF", "PNG", "JPEG", "convert", "resize", "watermark",
                                                  "rename", "profile", "fit", "fill", "crop",
@@ -207,11 +212,18 @@ enum SettingsDirectory {
                                       keywords: ["force quit", "process", "cpu", "memory", "kill"]),
             ]),
             (categories.utilities, [
+                SettingsDirectoryItem(page: .notch,
+                                      title: FeatureStrings.notch(language).title,
+                                      icon: "macbook",
+                                      keywords: [FeatureStrings.notch(language).description,
+                                                 "notch", "camera", "music", "clipboard"]),
                 SettingsDirectoryItem(page: .commandBar,
                                       title: FeatureStrings.commandBar(language).pageTitle,
                                       icon: "command",
                                       keywords: [FeatureStrings.commandBar(language).openButton,
-                                                 FeatureStrings.commandBar(language).searchPlaceholder]),
+                                                 FeatureStrings.commandBar(language).searchPlaceholder,
+                                                 FeatureStrings.commandBar(language).appCenterTitle,
+                                                 FeatureStrings.commandBar(language).appAliasLabel]),
                 SettingsDirectoryItem(page: .quickTools, title: s.quickToolsTab, icon: "wand.and.rays",
                                        featureKeywords: [
                                         (.quickLauncher, [s.launcherName]),
@@ -252,7 +264,8 @@ enum SettingsDirectory {
                                       keywords: [FeatureStrings.radialMenu(language).addButton,
                                                  FeatureStrings.radialMenu(language).kindApp,
                                                  FeatureStrings.radialMenu(language).kindMedia,
-                                                 FeatureStrings.radialMenu(language).kindSubmenu]),
+                                                 FeatureStrings.radialMenu(language).kindSubmenu,
+                                                 FeatureStrings.radialMenu(language).mouseTriggerRequirement]),
             ]),
             (categories.app, [
                 SettingsDirectoryItem(page: .shortcuts, title: s.shortcutsPageTitle, icon: "command",

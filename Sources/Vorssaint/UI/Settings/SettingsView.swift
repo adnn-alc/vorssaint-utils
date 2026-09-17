@@ -148,7 +148,16 @@ struct SettingsView: View {
                 if !items.isEmpty {
                     Section(section.title) {
                         ForEach(items) { item in
-                            Label(item.title, systemImage: item.icon).tag(item.page)
+                            Label {
+                                Text(item.title)
+                            } icon: {
+                                Image(systemName: item.icon)
+                                    // The sidebar's automatic icon tint can briefly disappear
+                                    // while the window activates. Resolve it in the icon itself.
+                                    .foregroundStyle(router.page == item.page
+                                        ? AnyShapeStyle(.primary) : AnyShapeStyle(.tint))
+                            }
+                            .tag(item.page)
                         }
                     }
                 }
@@ -348,6 +357,7 @@ struct SettingsView: View {
         case .general: GeneralSettings()
         case .features: FeatureHubSettings()
         case .textSnippets: TextSnippetsSettings()
+        case .notch: NotchSettings()
         case .radialMenu: RadialMenuSettings()
         case .commandBar: CommandBarSettings()
         case .energy: EnergySettings()
@@ -647,6 +657,7 @@ struct EnergySettings: View {
     @AppStorage(DefaultsKey.keepAwakeAutoStart) private var keepAwakeAutoStart = false
     @AppStorage(DefaultsKey.keepAwakeRightClickToggle) private var keepAwakeRightClickToggle = false
     @AppStorage(DefaultsKey.keepAwakeAllowDisplaySleep) private var keepAwakeAllowDisplaySleep = false
+    @AppStorage(DefaultsKey.keepAwakePauseWhenLocked) private var keepAwakePauseWhenLocked = false
     @AppStorage(DefaultsKey.showCountdown) private var showCountdown = false
     @AppStorage(DefaultsKey.keepAwakeIconTint) private var keepAwakeIconTint = KeepAwakeIconTint.orange.rawValue
     @AppStorage(DefaultsKey.keepAwakeActiveIcon) private var keepAwakeActiveIcon = KeepAwakeActiveIcon.vorssaint.rawValue
@@ -684,6 +695,11 @@ struct EnergySettings: View {
                 Section(automationStrings.automationSection) {
                     SettingsCaptionText(automationStrings.automationCaption)
                     KeepAwakeAutomationEditor()
+                }
+                Section {
+                    SettingsToggleWithCaption(title: automationStrings.pauseWhenLockedToggle,
+                                              caption: automationStrings.pauseWhenLockedCaption,
+                                              isOn: $keepAwakePauseWhenLocked)
                 }
                 if PowerSampler.hasInternalBattery {
                     Section(l10n.s.batteryProtectionSection) {
@@ -750,27 +766,32 @@ struct EnergySettings: View {
                             SettingsCaptionText(displayControlFailureText(failure, strings: strings))
                                 .foregroundStyle(.red)
                         }
-                        SettingsToggleWithCaption(title: strings.keysToggle,
-                                                  caption: strings.keysCaption,
-                                                  isOn: $brightnessKeysEnabled)
-                            .onChange(of: brightnessKeysEnabled) { _, isOn in
-                                if isOn { Permissions.shared.requestAccessibility() }
-                                BrightnessService.shared.syncWithPreferences()
-                            }
-                        if brightness.brightnessOSDSupported {
-                            SettingsToggleWithCaption(title: strings.osdToggle,
-                                                      caption: strings.osdCaption,
-                                                      isOn: $brightnessOSDEnabled)
-                                .onChange(of: brightnessOSDEnabled) { _, isOn in
+                        DisclosureGroup {
+                            SettingsToggleWithCaption(title: strings.keysToggle,
+                                                      caption: strings.keysCaption,
+                                                      isOn: $brightnessKeysEnabled)
+                                .onChange(of: brightnessKeysEnabled) { _, isOn in
                                     if isOn { Permissions.shared.requestAccessibility() }
                                     BrightnessService.shared.syncWithPreferences()
                                 }
+                            DisplayBrightnessShortcutControls()
+                            if brightness.brightnessOSDSupported {
+                                SettingsToggleWithCaption(title: strings.osdToggle,
+                                                          caption: strings.osdCaption,
+                                                          isOn: $brightnessOSDEnabled)
+                                    .onChange(of: brightnessOSDEnabled) { _, isOn in
+                                        if isOn { Permissions.shared.requestAccessibility() }
+                                        BrightnessService.shared.syncWithPreferences()
+                                    }
+                            }
+                            if (brightnessKeysEnabled || brightnessOSDEnabled),
+                               !permissions.accessibility {
+                                PermissionRow(kind: .accessibility)
+                            }
+                            SettingsCaptionText(strings.externalCaption)
+                        } label: {
+                            Text(FeatureStrings.recorder(l10n.language).moreOptions)
                         }
-                        if (brightnessKeysEnabled || brightnessOSDEnabled),
-                           !permissions.accessibility {
-                            PermissionRow(kind: .accessibility)
-                        }
-                        SettingsCaptionText(strings.externalCaption)
                     }
                 }
                 .settingsSectionAnchor(.brightness)
@@ -1194,6 +1215,7 @@ struct SwitcherSettings: View {
     @ObservedObject private var permissions = Permissions.shared
     @ObservedObject private var dockPreview = DockPreviewService.shared
     @AppStorage(DefaultsKey.switcherEnabled) private var switcherEnabled = true
+    @AppStorage(DefaultsKey.switcherTakeOverSystemShortcuts) private var switcherTakeOverSystemShortcuts = false
     @AppStorage(DefaultsKey.switcherShortcut) private var switcherShortcutStorage = GlobalShortcut.switcherDefault.storageValue
     @AppStorage(DefaultsKey.switcherIconRowMode) private var switcherIconRowMode = false
     @AppStorage(DefaultsKey.switcherSimpleMode) private var switcherSimpleMode = false
@@ -1202,23 +1224,38 @@ struct SwitcherSettings: View {
     @AppStorage(DefaultsKey.switcherMinimizedPlacement) private var switcherMinimizedPlacement = WindowSwitchMinimizedPlacement.normal.rawValue
     @AppStorage(DefaultsKey.switcherShowFullscreenWindows) private var switcherShowFullscreenWindows = true
     @AppStorage(DefaultsKey.switcherScreenPlacement) private var switcherScreenPlacement = SwitcherScreenPlacement.fallback.rawValue
+    @AppStorage(DefaultsKey.switcherCurrentDisplayOnly) private var switcherCurrentDisplayOnly = false
     @AppStorage(DefaultsKey.switcherCurrentSpaceOnly) private var switcherCurrentSpaceOnly = false
     @AppStorage(DefaultsKey.switcherSearchPinEnabled) private var switcherSearchPinEnabled = false
     @AppStorage(DefaultsKey.switcherShowShortcutHints) private var switcherShowShortcutHints = true
     @AppStorage(DefaultsKey.switcherAppearanceDelay) private var switcherAppearanceDelay = SwitcherSupport.defaultAppearanceDelayMilliseconds
     @AppStorage(DefaultsKey.dockPreviewEnabled) private var dockPreviewEnabled = false
+    @AppStorage(DefaultsKey.dockPreviewCurrentSpaceOnly) private var dockPreviewCurrentSpaceOnly = false
     @AppStorage(DefaultsKey.dockPreviewBackgroundOpacity) private var dockPreviewBackgroundOpacity = 1.0
     @AppStorage(DefaultsKey.dockPreviewOpenDelay) private var dockPreviewOpenDelay = DockPreviewSupport.defaultOpenDelayMilliseconds
     @AppStorage(DefaultsKey.dockPreviewQuitAppOnClose) private var dockPreviewQuitAppOnClose = false
     @AppStorage(DefaultsKey.dockClickMinimize) private var dockClickMinimize = false
     @AppStorage(DefaultsKey.dockClickHide) private var dockClickHide = false
     @AppStorage(DefaultsKey.dockClickCycleWindows) private var dockClickCycleWindows = false
+    @AppStorage(DefaultsKey.minimalWindowPreviews) private var minimalPreviews = false
     @AppStorage(DefaultsKey.previewSize) private var previewSize = "normal"
 
     private var switcherEngaged: Bool { switcherEnabled && AppFeature.switcher.isAvailable }
     private var dockPreviewEngaged: Bool { dockPreviewEnabled && AppFeature.dockPreview.isAvailable }
     private var switcherShortcutDisplayString: String {
         (GlobalShortcut(storageValue: switcherShortcutStorage) ?? .switcherDefault).displayString
+    }
+    private var switcherWindowlessAppsSelection: Binding<String> {
+        Binding(
+            get: {
+                SwitcherWindowlessApps.mode(
+                    storedValue: switcherWindowlessApps,
+                    takeOverSystemShortcuts: switcherTakeOverSystemShortcuts).rawValue
+            },
+            set: { value in
+                if !switcherTakeOverSystemShortcuts { switcherWindowlessApps = value }
+            }
+        )
     }
 
     var body: some View {
@@ -1243,6 +1280,15 @@ struct SwitcherSettings: View {
                         AppSwitcher.shared.syncWithPreferences()
                     }
                     Text(l10n.s.switcherWindowShortcutCaption)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Toggle(l10n.s.switcherTakeOverSystemShortcuts,
+                           isOn: $switcherTakeOverSystemShortcuts)
+                        .disabled(!switcherEnabled)
+                        .onChange(of: switcherTakeOverSystemShortcuts) { _, _ in
+                            AppSwitcher.shared.syncWithPreferences()
+                        }
+                    Text(l10n.s.switcherTakeOverSystemShortcutsCaption)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(String(format: l10n.s.switcherUsageHintFormat,
@@ -1330,18 +1376,25 @@ struct SwitcherSettings: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
+                    Toggle(l10n.s.switcherCurrentDisplayOnly, isOn: $switcherCurrentDisplayOnly)
+                        .disabled(!switcherEnabled)
+                    Text(l10n.s.switcherCurrentDisplayOnlyCaption)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
                     Toggle(l10n.s.switcherCurrentSpaceOnly, isOn: $switcherCurrentSpaceOnly)
                         .disabled(!switcherEnabled)
                     Text(l10n.s.switcherCurrentSpaceOnlyCaption)
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    Picker(l10n.s.switcherWindowlessApps, selection: $switcherWindowlessApps) {
+                    Picker(l10n.s.switcherWindowlessApps,
+                           selection: switcherWindowlessAppsSelection) {
                         Text(l10n.s.switcherWindowlessAppsOff).tag(SwitcherWindowlessApps.off.rawValue)
                         Text(l10n.s.switcherWindowlessAppsFinder).tag(SwitcherWindowlessApps.finder.rawValue)
                         Text(l10n.s.switcherWindowlessAppsAll).tag(SwitcherWindowlessApps.all.rawValue)
                     }
-                    .disabled(!switcherEnabled)
+                    .disabled(!switcherEnabled || switcherTakeOverSystemShortcuts)
                     Text(l10n.s.switcherWindowlessAppsCaption)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1360,6 +1413,11 @@ struct SwitcherSettings: View {
                             .font(.caption)
                             .foregroundStyle(dockPreviewWarning ? .orange : .secondary)
                         if dockPreviewEnabled {
+                            Toggle(l10n.s.switcherCurrentSpaceOnly, isOn: $dockPreviewCurrentSpaceOnly)
+                                .onChange(of: dockPreviewCurrentSpaceOnly) { _, _ in
+                                    DockPreviewService.shared.syncWithPreferences()
+                                }
+                            SettingsCaptionText(l10n.s.dockPreviewCurrentSpaceOnlyCaption)
                             HStack {
                                 Text(l10n.s.dockPreviewOpenDelay)
                                 Spacer()
@@ -1444,6 +1502,8 @@ struct SwitcherSettings: View {
                     .onChange(of: previewSize) { _, _ in
                         AppSwitcher.shared.syncWithPreferences()
                     }
+                    Toggle(l10n.s.minimalWindowPreviews, isOn: $minimalPreviews)
+                    SettingsCaptionText(l10n.s.minimalWindowPreviewsCaption)
                     WindowPreviewExclusionsList()
                 } header: {
                     Text(FeatureStrings.windowPreviewExclusions(l10n.language).sectionTitle)
@@ -1580,7 +1640,7 @@ struct AboutSettings: View {
                     appDelegate()?.showOnboarding()
                 }
                 Button(l10n.s.reviewHighlights) {
-                    appDelegate()?.showUpdateHighlights(includeSupportIntro: true)
+                    appDelegate()?.showUpdateHighlights()
                 }
                 Link(l10n.s.viewOnGitHub, destination: AppInfo.repositoryURL)
             }

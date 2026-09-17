@@ -58,6 +58,8 @@ final class SmoothScrollService: ObservableObject {
     /// Timestamp (ns, event clock) of the last event carrying a gesture phase —
     /// only touch devices emit those. Read/written solely on the tap callback.
     private var lastGesturePhaseTimestamp: UInt64?
+    private var tapCreationRetryUsed = false
+    private var tapCreationRetryWork: DispatchWorkItem?
 
     private init() {
         // Fast user switching: the tap goes back while this session is off
@@ -112,10 +114,21 @@ final class SmoothScrollService: ObservableObject {
             MouseAppExceptions.shared.setSourceTracking(false, for: .smoothScroll)
             isRunning = false
             // A create that fails during the session handoff gets one more look once the switch settles.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.syncWithPreferences() }
+            guard !tapCreationRetryUsed else { return }
+            tapCreationRetryUsed = true
+            let work = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.tapCreationRetryWork = nil
+                self.syncWithPreferences()
+            }
+            tapCreationRetryWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
             return
         }
 
+        tapCreationRetryUsed = false
+        tapCreationRetryWork?.cancel()
+        tapCreationRetryWork = nil
         self.tap = tap
         let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         runLoopSource = source
@@ -129,6 +142,9 @@ final class SmoothScrollService: ObservableObject {
     }
 
     private func stop() {
+        tapCreationRetryWork?.cancel()
+        tapCreationRetryWork = nil
+        tapCreationRetryUsed = false
         MouseAppExceptions.shared.setSourceTracking(false, for: .smoothScroll)
         removeScreenObserver()
         removeSleepObserver()
@@ -178,6 +194,15 @@ final class SmoothScrollService: ObservableObject {
         let sourceProcessID = event.getIntegerValueField(.eventSourceUnixProcessID)
         guard event.getIntegerValueField(.eventSourceUserData) != ScrollWheelSupport.syntheticTag,
               sourceProcessID != Self.ownProcessID else {
+            return Unmanaged.passUnretained(event)
+        }
+        // A stepped capture-loupe notch is a discrete command, so it must
+        // reach the overlay now rather than being expanded into a delayed
+        // glide. The opposite (fast) loupe mode intentionally keeps that
+        // glide, including when Option temporarily swaps the two modes.
+        if ScreenshotSelectionController.steppedLoupeNeedsRawWheel(
+            optionPressed: event.flags.contains(.maskAlternate)) {
+            stopGlide()
             return Unmanaged.passUnretained(event)
         }
         // Touch devices are already smooth; only mouse wheels glide. The
