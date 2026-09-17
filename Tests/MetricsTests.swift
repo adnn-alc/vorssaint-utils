@@ -16104,7 +16104,7 @@ struct MetricsTests {
         for language in AppLanguage.allCases {
             let values = Mirror(reflecting: FeatureStrings.mouseButtons(language)).children
                 .compactMap { $0.value as? String }
-            expect(values.count == 30 && values.allSatisfy { !$0.isEmpty },
+            expect(values.count == 32 && values.allSatisfy { !$0.isEmpty },
                    "every mouse button string is set for \(language.rawValue)")
             expect(values.allSatisfy { !$0.contains("—") },
                    "no em-dash in visible mouse button strings (\(language.rawValue))")

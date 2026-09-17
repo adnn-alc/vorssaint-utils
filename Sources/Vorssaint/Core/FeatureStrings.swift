@@ -904,12 +904,9 @@ struct ClipboardFeatureStrings {
         autoClearOnScreenLock: "Vider le presse-papiers au verrouillage de l’écran",
         autoClearCaption: "Seul le presse-papiers du système est vidé. Les éléments enregistrés restent dans l’historique.",
         deleteSelectedFormat: "Supprimer %d",
-        autoClearOnDisplaySleep: "Vider le presse-papiers à l'extinction de l'écran",
-        autoClearOnScreenLock: "Vider le presse-papiers au verrouillage de l'écran",
-        autoClearCaption: "Seul le presse-papiers du système est vidé. Les éléments enregistrés restent dans l'historique.",
         menuBarPreview: "Afficher la dernière copie dans la barre des menus",
-        menuBarPreviewCaption: "Affiche un aperçu raccourci de votre dernière copie à côté de l'icône. Cliquez dessus pour ouvrir l'historique.",
-        menuBarPreviewLength: "Longueur de l'aperçu",
+        menuBarPreviewCaption: "Affiche un aperçu raccourci de votre dernière copie à côté de l’icône. Cliquez dessus pour ouvrir l’historique.",
+        menuBarPreviewLength: "Longueur de l’aperçu",
         menuBarPreviewLengthSuffix: "caractères"
     )
 
@@ -968,9 +965,9 @@ struct ClipboardFeatureStrings {
         autoClearOnScreenLock: "Svuota gli appunti al blocco dello schermo",
         autoClearCaption: "Svuota solo gli appunti di sistema. Gli elementi salvati restano nella cronologia.",
         deleteSelectedFormat: "Elimina %d",
-        menuBarPreview: "Mostra l'ultima copia nella barra dei menu",
-        menuBarPreviewCaption: "Mostra un'anteprima abbreviata dell'ultima copia accanto all'icona. Fai clic per aprire la cronologia.",
-        menuBarPreviewLength: "Lunghezza dell'anteprima",
+        menuBarPreview: "Mostra l’ultima copia nella barra dei menu",
+        menuBarPreviewCaption: "Mostra un’anteprima abbreviata dell’ultima copia accanto all’icona. Fai clic per aprire la cronologia.",
+        menuBarPreviewLength: "Lunghezza dell’anteprima",
         menuBarPreviewLengthSuffix: "caratteri"
     )
 
