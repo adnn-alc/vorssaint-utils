@@ -663,8 +663,9 @@ final class StatusItemController {
     // MARK: - Clipboard preview item
 
     /// Creates or removes the clipboard preview item for the feature itself
-    /// being on or off, and keeps its text current while it exists — going
-    /// blank rather than being removed when there is simply nothing to show.
+    /// being on or off, and keeps its text current while it exists — hidden
+    /// rather than removed when there is simply nothing to show, so it never
+    /// sits in the bar as a bare empty gap.
     /// Runs on every entries/isRunning change and on every settings sync, so
     /// toggling the option or the character limit takes effect immediately.
     private func syncClipboardPreviewItem() {
@@ -679,17 +680,22 @@ final class StatusItemController {
             return
         }
 
-        // The feature itself is on; keep the item alive even with nothing to
-        // show right now (e.g. right after Clear All) rather than removing
-        // it. macOS does not reliably restore a dragged position for an item
-        // recreated later — it would otherwise land back at the default spot
-        // the next time something is copied.
+        // The feature itself is on; keep the item itself alive even with
+        // nothing to show right now (e.g. right after Clear All) rather than
+        // removing it — macOS does not reliably restore a dragged position
+        // for an item recreated later, so removing it would land it back at
+        // the default spot the next time something is copied. Hidden rather
+        // than shown blank, though: an empty title would otherwise sit in
+        // the bar as a bare gap.
         //
-        // No fallback to recentEntries here: latestPasteboardEntry is seeded
-        // at load and kept correct from then on (nil means the pasteboard was
-        // actually cleared, or the last change was deliberately not recorded),
-        // so falling back to history would undo exactly that — e.g. auto
-        // clear wiping the pasteboard while the entry stays in history.
+        // No fallback to recentEntries here: latestPasteboardEntry is
+        // matched against the pasteboard's real content as soon as history
+        // starts watching (at launch, and whenever the feature is toggled
+        // back on) and kept correct from then on (nil means the pasteboard
+        // was actually cleared, or the last change was deliberately not
+        // recorded), so falling back to history would undo exactly that —
+        // e.g. auto clear wiping the pasteboard while the entry stays in
+        // history.
         let entry = history.latestPasteboardEntry
         let maxCharacters = Defaults.sanitizedClipboardMenuBarPreviewLength(
             defaults.integer(forKey: DefaultsKey.clipboardHistoryMenuBarPreviewLength))
@@ -698,6 +704,9 @@ final class StatusItemController {
         let item = clipboardPreviewStatusItem ?? installClipboardPreviewStatusItem()
         if item.length != NSStatusItem.variableLength {
             item.length = NSStatusItem.variableLength
+        }
+        if item.isVisible != (entry != nil) {
+            item.isVisible = entry != nil
         }
         guard let button = item.button else { return }
         // A non-nil empty image, not the metric items' actual glyph: same

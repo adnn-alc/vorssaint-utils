@@ -240,11 +240,12 @@ struct MetricsTests {
             .menuBarText(maxCharacters: 20)
         expect(longMenuBarPreview.count == 21 && longMenuBarPreview.hasSuffix("…"),
                "a copy longer than the limit is cut to the limit plus an ellipsis")
+        L10n.shared.language = .enUS
         let imageMenuBarPreview = ClipboardHistoryEntry(text: "", kind: .image,
                                                         imageWidth: 400, imageHeight: 300)
             .menuBarText(maxCharacters: 20)
-        expect(imageMenuBarPreview == "400×300",
-               "an image copy shows its dimensions instead of empty text")
+        expect(imageMenuBarPreview == "Image · 400×300",
+               "an image copy is labeled the same way every other image row is, not left as bare dimensions")
 
         // MARK: Clipboard auto clear timing
 

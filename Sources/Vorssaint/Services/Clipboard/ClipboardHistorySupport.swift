@@ -80,10 +80,20 @@ struct ClipboardHistoryEntry: Codable, Equatable, Identifiable {
     }
 
     /// `preview` collapsed further to a menu bar sized excerpt, for the
-    /// optional "show latest copy" status item.
+    /// optional "show latest copy" status item. `preview` itself renders an
+    /// image as bare dimensions (nothing else displays it raw — every other
+    /// image row builds its own labeled string instead), so this adds the
+    /// same localized "Image" label those rows show next to the dimensions.
     func menuBarText(maxCharacters: Int) -> String {
-        guard preview.count > maxCharacters else { return preview }
-        return String(preview.prefix(maxCharacters)) + "…"
+        let base: String
+        if kind == .image {
+            let imageLabel = FeatureStrings.clipboard(L10n.shared.language).imageEntryLabel
+            base = "\(imageLabel) · \(imageDimensionsLabel)"
+        } else {
+            base = preview
+        }
+        guard base.count > maxCharacters else { return base }
+        return String(base.prefix(maxCharacters)) + "…"
     }
 
     /// Same clipboard content, regardless of when it was copied: re-copying

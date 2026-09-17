@@ -590,20 +590,48 @@ final class ClipboardHistoryService: ObservableObject {
     /// Establishes the starting change count on the same background lane used
     /// by later reads. Existing clipboard content is not added just because
     /// history was enabled, matching the previous synchronous baseline.
+    ///
+    /// It does match that content against the saved entries, though: history
+    /// starting to watch again (at launch, or the feature toggled back on)
+    /// is otherwise exactly when latestPasteboardEntry is most likely wrong —
+    /// stale from before a toggle-off, or still nil right after launch even
+    /// though the last real copy is sitting there unchanged. A match means
+    /// the current clipboard content is a real, previously captured entry; no
+    /// match (nothing recorded it, or it was copied while history was off)
+    /// leaves the preview blank rather than guessing.
     private func baselinePasteboard() {
         guard !captureInFlight else { return }
         captureInFlight = true
         captureGeneration &+= 1
         let generation = captureGeneration
         scheduleCaptureTimeout(generation: generation)
+        let includeImagesFiles = UserDefaults.standard.bool(
+            forKey: DefaultsKey.clipboardHistoryIncludeImagesFiles)
         GeneralPasteboardAccess.shared.async { [weak self] in
             let changeCount = NSPasteboard.general.changeCount
+            let content = Self.readPasteboard(includeImagesFiles: includeImagesFiles)
             DispatchQueue.main.async {
                 guard let self, self.captureGeneration == generation else { return }
                 self.captureInFlight = false
                 guard self.isRunning else { return }
                 self.lastChangeCount = max(self.lastChangeCount, changeCount)
+                self.latestPasteboardEntry = content.flatMap(self.matchingEntry)
             }
+        }
+    }
+
+    /// The saved entry, if any, whose content is exactly what was just read
+    /// off the pasteboard — the same field comparisons promote/promoteImage/
+    /// promoteFiles use to recognize a re-copy of something already saved.
+    private func matchingEntry(for content: CapturedContent) -> ClipboardHistoryEntry? {
+        switch content {
+        case .text(let text):
+            return entries.first(where: { $0.kind == .text && $0.text == text })
+        case .image(let image):
+            let hash = Self.sha256Hex(image.data)
+            return entries.first(where: { $0.kind == .image && $0.imageHash == hash })
+        case .files(let paths):
+            return entries.first(where: { $0.kind == .files && $0.filePaths == paths })
         }
     }
 
@@ -913,13 +941,15 @@ final class ClipboardHistoryService: ObservableObject {
         normalizeEntryOrder()
         trimToLimit()
         // latestPasteboardEntry is deliberately left nil here rather than
-        // seeded from recentEntries.first: baselinePasteboard() takes
-        // whatever the pasteboard's change count already is as the starting
-        // point, so a copy made while Vorssaint was quit is never seen as a
-        // change once it launches — a seed here would have no way to
-        // self-correct and could advertise stale content for the rest of
-        // the session. The menu bar preview starts blank and fills in on
-        // the first real capture or reused entry instead.
+        // seeded from recentEntries.first: entries just came off disk and
+        // nothing has checked them against the pasteboard's actual content
+        // yet, so a blind seed could easily be wrong (nothing was copied
+        // since the last launch, or the top saved entry isn't the one that
+        // was on the clipboard when this quit). start() calls
+        // baselinePasteboard() right after, on the same background lane
+        // used for real reads, which matches the pasteboard's real content
+        // against entries and sets this correctly — or leaves it nil when
+        // nothing matches.
         // Sweep image files that lost their entry (crash between write and save).
         ClipboardImageStore.cleanup(keeping: Set(entries.compactMap(\.imageFile)))
         // A history read from the legacy blob migrates right away instead of
