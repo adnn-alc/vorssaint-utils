@@ -40,8 +40,9 @@ struct MetricsTests {
             ("cleaner", { CleanerEligibilityTests.run(suite) }),
             ("uninstaller", { UninstallerFlowTests.run(suite) }),
             ("launcher", { QuickLauncherContract.run(suite) }),
-            ("switcher", { SwitcherScrollContract.run(suite) }),
+            ("switcher", { SwitcherScrollContract.run(suite); SwitcherActivationTests.run(suite) }),
             ("keep-awake", { KeepAwakeCatalogContract.run(suite) }),
+            ("emoji", { CommandBarEmojiContract.run(suite) }),
         ]
         var selected = Set<String>()
         var listOnly = false
@@ -4792,6 +4793,14 @@ struct MetricsTests {
                 && Defaults.registeredDefaults[DefaultsKey.windowLayoutShortcutCenterHalf] as? String
                     == WindowLayoutAction.clearedShortcutStorageValue,
                "center half starts with no combination of its own")
+        expect(WindowLayoutAction.allCases.contains(.centerTwoThirds)
+                && WindowLayoutAction.centerTwoThirds.shortcutID == 56
+                && WindowLayoutAction(shortcutID: 56) == .centerTwoThirds,
+               "center two thirds exists and answers to its own shortcut id")
+        expect(WindowLayoutAction.centerTwoThirds.defaultShortcut == nil
+                && Defaults.registeredDefaults[DefaultsKey.windowLayoutShortcutCenterTwoThirds] as? String
+                    == WindowLayoutAction.clearedShortcutStorageValue,
+               "center two thirds starts with no combination of its own")
         expect(Set(WindowLayoutAction.allCases.map(\.shortcutID)).count
                 == WindowLayoutAction.allCases.count,
                "every layout action keeps a distinct shortcut id")
@@ -4799,7 +4808,8 @@ struct MetricsTests {
             let layoutStrings = FeatureStrings.windowLayout(language)
             expect(!layoutStrings.fullScreen.isEmpty && !layoutStrings.previousDisplay.isEmpty
                     && !layoutStrings.marginMaximize.isEmpty
-                    && !layoutStrings.centerHalf.isEmpty,
+                    && !layoutStrings.centerHalf.isEmpty
+                    && !layoutStrings.centerTwoThirds.isEmpty,
                    "\(language.rawValue) names the latest window layout actions")
         }
         expect(WindowLayoutGeometry.accepts(actualRect: .zero, targetRect: .zero,
@@ -6468,6 +6478,9 @@ struct MetricsTests {
         expect(WindowLayoutGeometry.rect(for: .centerHalf, current: currentWindow, visibleFrame: visibleFrame)
                == CGRect(x: 360, y: 40, width: 720, height: 860),
                "window layout center half sits half wide in the middle of the screen")
+        expect(WindowLayoutGeometry.rect(for: .centerTwoThirds, current: currentWindow, visibleFrame: visibleFrame)
+               == CGRect(x: 240, y: 40, width: 960, height: 860),
+               "window layout center two thirds sits two thirds wide in the middle of the screen")
         expect(WindowLayoutGeometry.rect(for: .leftHalf, current: currentWindow, visibleFrame: visibleFrame,
                                          windowGap: 16)
                == CGRect(x: 0, y: 40, width: 712, height: 860),
@@ -12595,6 +12608,17 @@ struct MetricsTests {
                "App Switcher activates only the selected window when a window target exists")
         expect(SwitcherSupport.shouldActivateAllWindows(targetsSpecificWindow: false),
                "App Switcher can activate the full app for app-only entries")
+        // App-level activation can raise sibling windows, so a window-scoped
+        // plan first asks the window server for the exact window (issue #1503).
+        let windowScopedPlan = SwitcherSupport.activationPlan(targetsSpecificWindow: true)
+        let appScopedPlan = SwitcherSupport.activationPlan(targetsSpecificWindow: false)
+        expect(SwitcherSupport.appActivationRoute(plan: windowScopedPlan, windowID: 77)
+               == .exactWindow(77),
+               "a selected window is fronted by the window server, not by activating its app")
+        expect(SwitcherSupport.appActivationRoute(plan: appScopedPlan, windowID: 77) == .wholeApp,
+               "an app entry still activates the whole app the way Command-Tab does")
+        expect(SwitcherSupport.appActivationRoute(plan: windowScopedPlan, windowID: nil) == .wholeApp,
+               "a window-scoped plan without a window id has only the app to activate")
         expect(SwitcherSupport.shouldRestoreSourceAfterTargetMinimize(targetPID: 10,
                                                                       sourcePID: 20,
                                                                       frontmostPID: 10,
@@ -23834,6 +23858,60 @@ struct MetricsTests {
                "popular emoji keep a predictable lead over the Unicode long tail")
         expect(emojiCharacters.count == CommandBarEmoji.emoji.count,
                "no emoji is offered twice")
+
+        // MARK: Skin tones
+
+        expect(CommandBarEmoji.SkinTone.allCases.count == 6
+                && CommandBarEmoji.SkinTone.none.modifier == nil
+                && CommandBarEmoji.SkinTone.allCases.dropFirst().allSatisfy {
+                    $0.modifier?.properties.isEmojiModifier == true
+                },
+               "the yellow default and the five tones Unicode defines, and nothing else")
+        expect(CommandBarEmoji.acceptsSkinTone("👍") && CommandBarEmoji.acceptsSkinTone("☝️"),
+               "a hand takes a tone whether or not it carries a presentation selector")
+        expect(!CommandBarEmoji.acceptsSkinTone("😀") && !CommandBarEmoji.acceptsSkinTone("🍕")
+                && !CommandBarEmoji.acceptsSkinTone("🤷\u{200D}♀️"),
+               "a face, an object and a sequence are all left alone")
+        expect(CommandBarEmoji.applying(.medium, to: "👍") == "👍\u{1F3FD}",
+               "a tone is the modifier appended to the emoji")
+        expect(CommandBarEmoji.applying(.medium, to: "☝️")
+                == "\u{261D}\u{1F3FD}",
+               "the presentation selector goes with the tone, which already implies it")
+        expect(CommandBarEmoji.SkinTone.allCases.allSatisfy {
+            CommandBarEmoji.applying($0, to: "☝️").count == 1
+        }, "every tone of an emoji is still one character to type and to delete")
+        expect(CommandBarEmoji.applying(.none, to: "👍") == "👍"
+                && CommandBarEmoji.applying(.dark, to: "🍕") == "🍕",
+               "the default and an emoji with no tone to give are returned untouched")
+        expect(Set(CommandBarEmoji.SkinTone.allCases.map(\.swatch)).count
+                == CommandBarEmoji.SkinTone.allCases.count,
+               "the picker shows a different hand for every tone it offers")
+        expect(CommandBarEmoji.emoji.contains { CommandBarEmoji.acceptsSkinTone($0.character) }
+                && CommandBarEmoji.emoji.contains { !CommandBarEmoji.acceptsSkinTone($0.character) },
+               "the offered set has emoji that take a tone and emoji that do not")
+        expect(CommandBarPreferences.skinTone(from: "") == CommandBarEmoji.SkinTone.none
+                && CommandBarPreferences.skinTone(from: "dark") == CommandBarEmoji.SkinTone.dark
+                && CommandBarPreferences.skinTone(from: "mauve") == CommandBarEmoji.SkinTone.none,
+               "a tone survives storage, and one this version does not know reads as the default")
+        expect(Defaults.registeredDefaults[DefaultsKey.commandBarEmojiSkinTone] as? String == "",
+               "emoji ship in the tone Unicode gives them until the person says otherwise")
+        expect(SettingsBackupSupport.exportKeys().contains(DefaultsKey.commandBarEmojiSkinTone),
+               "the chosen tone is configuration, so it travels with an exported setup")
+        expect(CommandBarPreferences.emojiIdentity(
+            fromRowID: CommandBarPreferences.emojiRowID(identity: "👍")) == "👍",
+               "the emoji comes back out of the id its row is stored under")
+        expect(CommandBarEmoji.SkinTone.allCases.filter { $0 != .none }.allSatisfy {
+            CommandBarEmoji.applying($0, to: "👍") != "👍"
+        }, "every tone changes the character, so an id carrying one would move with it")
+        expect(CommandBarPreferences.emojiIdentity(fromRowID: "app.finder") == nil
+                && CommandBarPreferences.emojiIdentity(fromRowID: "emoji.") == nil,
+               "a row of another kind, and an id with no emoji left in it, answer with nothing")
+        let catalogSource = (try? String(
+            contentsOfFile: "Sources/Vorssaint/Services/CommandBar/CommandBarCatalog.swift",
+            encoding: .utf8)) ?? ""
+        expect(catalogSource.contains("CommandBarPreferences.emojiRowID(identity: emoji.identity)"),
+               "the emoji rows take their id from the seam above, not from the toned character")
+
         expect(CommandBarSearch.emojiQuery(from: "fire") == nil,
                "an ordinary search never opens the emoji index")
         expect(CommandBarSearch.emojiQuery(from: ":fire") == "fire"

@@ -511,6 +511,7 @@ enum DefaultsKey {
     static let commandBarLinks = "commandBarLinks"           // Data: [CommandBarLink] JSON
     static let commandBarRowShortcuts = "commandBarRowShortcuts" // {row key: shortcut}
     static let commandBarPositionOffset = "commandBarPositionOffset" // "dx,dy" from the default spot
+    static let commandBarEmojiSkinTone = "commandBarEmojiSkinTone" // "" is the yellow default
     // The folders a file search looks in, one per line, written with a tilde
     // so an exported list still points somewhere on another Mac. Empty means
     // the bar looks for no files at all, which is the setting out of the box.
@@ -643,6 +644,7 @@ enum DefaultsKey {
     static let windowLayoutShortcutRightThird = "windowLayoutShortcutRightThird"
     static let windowLayoutShortcutLeftTwoThirds = "windowLayoutShortcutLeftTwoThirds"
     static let windowLayoutShortcutRightTwoThirds = "windowLayoutShortcutRightTwoThirds"
+    static let windowLayoutShortcutCenterTwoThirds = "windowLayoutShortcutCenterTwoThirds"
     static let windowLayoutShortcutPreviousDisplay = "windowLayoutShortcutPreviousDisplay"
     static let windowLayoutShortcutNextDisplay = "windowLayoutShortcutNextDisplay"
     static let windowLayoutShortcutFullScreen = "windowLayoutShortcutFullScreen"
@@ -1413,6 +1415,7 @@ enum Defaults {
         DefaultsKey.commandBarFileIgnores: "",
         DefaultsKey.commandBarShortcut: GlobalShortcut.commandBarDefault.storageValue,
         DefaultsKey.commandBarPositionOffset: "",
+        DefaultsKey.commandBarEmojiSkinTone: "",
         DefaultsKey.panelUtilityCommandBar: true,
         DefaultsKey.scratchpadRetention: ScratchpadRetention.never.rawValue,
         DefaultsKey.scratchpadCloseOnClickOutside: true,
@@ -1522,6 +1525,7 @@ enum Defaults {
         DefaultsKey.windowLayoutShortcutRightThird: GlobalShortcut.windowLayoutRightThirdDefault.storageValue,
         DefaultsKey.windowLayoutShortcutLeftTwoThirds: GlobalShortcut.windowLayoutLeftTwoThirdsDefault.storageValue,
         DefaultsKey.windowLayoutShortcutRightTwoThirds: GlobalShortcut.windowLayoutRightTwoThirdsDefault.storageValue,
+        DefaultsKey.windowLayoutShortcutCenterTwoThirds: WindowLayoutAction.clearedShortcutStorageValue,
         DefaultsKey.windowLayoutShortcutPreviousDisplay: WindowLayoutAction.clearedShortcutStorageValue,
         DefaultsKey.windowLayoutShortcutNextDisplay: GlobalShortcut.windowLayoutNextDisplayDefault.storageValue,
         DefaultsKey.windowLayoutShortcutTopLeftSixth: WindowLayoutAction.clearedShortcutStorageValue,
