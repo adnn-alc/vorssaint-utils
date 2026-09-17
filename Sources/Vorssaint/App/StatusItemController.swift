@@ -41,6 +41,12 @@ final class StatusItemController {
     /// is answered once afterwards rather than on top of it.
     private var isRefreshing = false
     private var refreshRequestedWhileRunning = false
+    /// True once the clipboard preview's own subscriptions are wired up.
+    /// Merely referencing ClipboardHistoryService.shared brings the whole
+    /// service to life — its saved history file and image folder included —
+    /// so bind() only touches it once the feature is actually available,
+    /// rather than for every launch regardless of whether anyone uses it.
+    private var clipboardBindingsInstalled = false
     private static let mainAutosaveName = "VorssaintMenuBarItem"
     private static let metricAutosavePrefix = "VorssaintMetric"
     private static let clipboardPreviewAutosaveName = "VorssaintClipboardPreview"
@@ -182,15 +188,7 @@ final class StatusItemController {
             }
             .store(in: &cancellables)
 
-        ClipboardHistoryService.shared.$latestPasteboardEntry
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.syncClipboardPreviewItem() }
-            .store(in: &cancellables)
-
-        ClipboardHistoryService.shared.$isRunning
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.syncClipboardPreviewItem() }
-            .store(in: &cancellables)
+        bindClipboardPreviewIfAvailable()
 
         defaultsObserver = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification,
                                                                   object: nil,
@@ -213,8 +211,30 @@ final class StatusItemController {
             self.syncMonitorMode()
             self.updateIconAppearance()
             self.refresh()
+            self.bindClipboardPreviewIfAvailable()
             self.syncClipboardPreviewItem()
         }
+    }
+
+    /// Wires up the clipboard preview's own subscriptions the first time the
+    /// feature is actually available — at launch if it already is, or the
+    /// moment a settings change (installing it from the hub, included) makes
+    /// it so. Referencing ClipboardHistoryService.shared any earlier would
+    /// bring the service to life for every launch, reading its saved history
+    /// file and scanning its image folder even for someone who never turned
+    /// the feature on.
+    private func bindClipboardPreviewIfAvailable() {
+        guard !clipboardBindingsInstalled, AppFeature.clipboardHistory.isAvailable else { return }
+        clipboardBindingsInstalled = true
+        ClipboardHistoryService.shared.$latestPasteboardEntry
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.syncClipboardPreviewItem() }
+            .store(in: &cancellables)
+
+        ClipboardHistoryService.shared.$isRunning
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.syncClipboardPreviewItem() }
+            .store(in: &cancellables)
     }
 
     deinit {
@@ -689,12 +709,19 @@ final class StatusItemController {
     /// toggling the option or the character limit takes effect immediately.
     private func syncClipboardPreviewItem() {
         let defaults = UserDefaults.standard
-        let history = ClipboardHistoryService.shared
+        // Checked before ever touching ClipboardHistoryService.shared: merely
+        // referencing it brings the whole service to life — its saved history
+        // file and image folder included — and this runs on every settings
+        // change, not just clipboard ones.
         guard AppFeature.clipboardHistory.isAvailable,
               defaults.bool(forKey: DefaultsKey.clipboardHistoryEnabled),
-              defaults.bool(forKey: DefaultsKey.clipboardHistoryMenuBarPreview),
-              history.isRunning
+              defaults.bool(forKey: DefaultsKey.clipboardHistoryMenuBarPreview)
         else {
+            removeClipboardPreviewStatusItem()
+            return
+        }
+        let history = ClipboardHistoryService.shared
+        guard history.isRunning else {
             removeClipboardPreviewStatusItem()
             return
         }

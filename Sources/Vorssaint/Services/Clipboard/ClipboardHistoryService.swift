@@ -573,6 +573,11 @@ final class ClipboardHistoryService: ObservableObject {
         isRunning = false
         ClipboardIgnoredApps.shared.setHistoryRunning(false)
         captureState.invalidate()
+        // Otherwise the last known copy keeps showing in the menu bar preview
+        // for the moment between history starting to watch again and the
+        // baseline check actually answering, instead of going blank right
+        // away like the rest of the feature does while stopped.
+        latestPasteboardEntry = nil
     }
 
     /// What the background pasteboard read hands back to the main thread.

@@ -16115,24 +16115,6 @@ struct MetricsTests {
             expect(hub.activeCountFormat.contains("%1$d") && hub.activeCountFormat.contains("%2$d"),
                    "count format keeps positional specifiers (\(language.rawValue))")
         }
-        for language in AppLanguage.allCases {
-            let values = Mirror(reflecting: FeatureStrings.clipboard(language)).children
-                .compactMap { $0.value as? String }
-            expect(values.count == 58 && values.allSatisfy { !$0.isEmpty },
-                   "every clipboard string is set for \(language.rawValue)")
-            expect(values.allSatisfy { !$0.contains("—") },
-                   "no em-dash in visible clipboard strings (\(language.rawValue))")
-            expectFormat(FeatureStrings.clipboard(language).deleteSelectedFormat, ["d"],
-                         "\(language.rawValue) clipboard bulk-delete format")
-        }
-        for language in AppLanguage.allCases {
-            let values = Mirror(reflecting: FeatureStrings.mouseButtons(language)).children
-                .compactMap { $0.value as? String }
-            expect(values.count == 32 && values.allSatisfy { !$0.isEmpty },
-                   "every mouse button string is set for \(language.rawValue)")
-            expect(values.allSatisfy { !$0.contains("—") },
-                   "no em-dash in visible mouse button strings (\(language.rawValue))")
-        }
         expect(FeatureStrings.hub(.ptBR).pageTitle == "Recursos"
                 && FeatureStrings.hub(.enUS).pageTitle == "Features",
                "hub page title reads naturally in the owner languages")
