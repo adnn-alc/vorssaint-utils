@@ -269,6 +269,13 @@ final class ClipboardHistoryService: ObservableObject {
     func togglePin(_ entry: ClipboardHistoryEntry) {
         guard let index = entries.firstIndex(where: { $0.id == entry.id }) else { return }
         let previousEntries = entries
+        // entries.remove(at:) below drops the entry for a moment before it is
+        // reinserted, and entries' own didSet reconciles latestPasteboardEntry
+        // against whatever is there right then — so if this is the entry it
+        // points to, that intermediate absence nils it out and nothing here
+        // sets it back, since a pin change is not a new promoted copy.
+        // Restored by looking it up again once the move actually lands.
+        let wasLatestPasteboardEntry = latestPasteboardEntry?.id == entry.id
         var updated = entries.remove(at: index)
         if updated.isPinned {
             updated.pinnedAt = nil
@@ -279,12 +286,18 @@ final class ClipboardHistoryService: ObservableObject {
         }
         normalizeEntryOrder()
         trimToLimit()
-        guard entries.contains(where: { $0.id == entry.id }),
-              ClipboardHistoryEditing.preservesPinnedEntries(from: previousEntries, in: entries)
-        else {
+        let reverted: Bool
+        if entries.contains(where: { $0.id == entry.id }),
+           ClipboardHistoryEditing.preservesPinnedEntries(from: previousEntries, in: entries) {
+            reverted = false
+        } else {
             entries = previousEntries
-            return
+            reverted = true
         }
+        if wasLatestPasteboardEntry {
+            latestPasteboardEntry = entries.first(where: { $0.id == entry.id })
+        }
+        guard !reverted else { return }
         save()
     }
 
